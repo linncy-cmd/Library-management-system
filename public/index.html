@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="./vendors/bootstrap/css/bootstrap.min.css">
+    <script src="./vendors/axios/axios.js"></script>
+    <style>
+        .form .off-padding {
+            padding: 0;
+        }
+        
+        .form label {
+            padding-right: 0;
+            height: 34px;
+            line-height: 34px;
+        }
+        
+        .form .form-group {
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-10" id="app">
+                <table class="table table-striped table-hover table-bordered">
+                    <caption class="bg-info">
+                        <h1 class="text-center">图书管理</h1>
+                        <form class="row form ">
+                            <div class="col-lg-5 row form-group">
+                                <label for="exampleInputuname2" class="col-lg-2 ">编号：</label>
+                                <div class="col-lg-9 off-padding">
+                                    <input type="text" class="form-control" id="exampleInputuname2" v-model="num" v-bind:disabled="flag">
+                                    <span class="text-center">{{info_num}}</span>
+                                </div>
+                            </div>
+                            <div class="col-lg-5 row form-group">
+                                <label for="exampleInputuname1" class="col-lg-2 ">名称：</label>
+                                <div class="col-lg-9 off-padding">
+                                    <input type="text" class="form-control" id="exampleInputuname1" v-model="name">
+                                    <span class="text-center">{{info_name}}</span>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary col-lg-1" @click.prevent="handle" :disabled="flag2">提交</button>
+                        </form>
+                        <div class="text-center">
+                            <span class="text-warning">{{info_error}}</span>
+                            <h2>图书总数：{{AllCount}}</h2>
+                        </div>
+                    </caption>
+                    <thead>
+                        <tr>
+                            <th class="text-center">编号</th>
+                            <th class="text-center">名称</th>
+                            <th class="text-center">时间</th>
+                            <th class="text-center">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr :key="index" v-for="(item,index) in books">
+                            <td class="text-center">{{item.num}}</td>
+                            <td class="text-center">{{item.name}}</td>
+                            <td class="text-center">{{item.updateAt | format("yyyy-MM-dd hh:mm:ss")}}</td>
+                            <td class="text-center">
+                                <a href="#" class="btn btn-primary" @click.prevent="modify(item.num)">修改</a>
+                                <a href="#" class="btn btn-danger" @click.prevent="remove(item.num)">删除</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+
+
+</body>
+<script src="./js/vue.js"></script>
+<script>
+    axios.defaults.baseURL = "http://localhost:3000"
+    var vm = new Vue({
+        el: "#app",
+        data: {
+            //是否禁用id输入框
+            flag: false,
+            //是否禁用提交框
+            flag2: false,
+            //序号提示
+            info_num: '',
+            //名称提示
+            info_name: '',
+            //错误提示
+            info_error: '',
+            //初始数据
+            id: '',
+            num: '',
+            name: '',
+            books: [],
+        },
+        // 局部过滤器
+        filters: {
+            //格式化时间方法
+            format: function(date, format) {
+                if (typeof date === 'string') {
+                    var mts = date.match(/(\/Date\((\d+)\)\/)/);
+                    if (mts && mts.length >= 3) {
+                        date = parseInt(mts[2]);
+                    }
+                }
+                date = new Date(date);
+                if (!date || date.toUTCString() == "Invalid Date") {
+                    return '';
+                }
+                var map = {
+                    "M": date.getMonth() + 1, //月份
+                    "d": date.getDate(), //日
+                    "h": date.getHours(), //小时
+                    "m": date.getMinutes(), //分
+                    "s": date.getSeconds(), //秒
+                    "q": Math.floor((date.getMonth() + 3) / 3), //季度
+                    "S": date.getMilliseconds(), //毫秒
+                };
+                format = format.replace(/([yMdhmsqS])+/g, function(all, t) {
+                    var v = map[t];
+                    if (v !== undefined) {
+                        if (all.length > 1) {
+                            v = '0' + v;
+                            v = v.substr(v.length - 2)
+                        }
+                        return v;
+                    } else if (t === 'y') {
+                        return (date.getFullYear() + "").substr(4 - all.length);
+                    }
+                    return all;
+                });
+                return format;
+            }
+        },
+        //方法
+        methods: {
+            handle: function() {
+                if (!this.flag) {
+                    //添加操作
+                    axios.post("/books", {
+                        id: this.id,
+                        name: this.name,
+                        num: this.num,
+                    }).then(ret => {
+                        this.books.push(ret.data);
+                        this.getData();
+                    }, error => {
+                        //获取错误返回对象error.response
+                        console.log(error.response.data.message);
+                        this.info_error = error.response.data.message;
+                    });
+                    this.num = '';
+                    this.name = "";
+                } else {
+                    //修改操作
+                    var item = this.books.find(item => item.num == this.num);
+                    if (this.name != item.name) {
+                        axios.put("/books/" + this.num, {
+                            name: this.name,
+                        }).then(ret => {
+                            this.getData();
+                            this.num = '';
+                            this.name = "";
+                        }, error => {
+                            //获取错误返回对象error.response
+                            console.log(error.response.data.message);
+                            this.info_error = error.response.data.message;
+                        })
+                    }
+                    this.num = '';
+                    this.name = "";
+                    this.flag = false;
+                }
+            },
+            modify: function(num) {
+                this.info_id = "";
+                this.info_uname = "";
+                var item = this.books.find(item => item.num == num);
+                this.num = item.num;
+                this.name = item.name;
+                this.flag = true;
+                // console.log(item.id)
+            },
+            remove: function(num) {
+                axios.delete("/books/" + num).then(ret => {
+                    console.log(ret.data);
+                })
+            },
+            getData: function() {
+                axios.get("/books").then(ret => {
+                    this.books = ret.data;
+                });
+            }
+
+        },
+        //计算属性
+        computed: {
+            AllCount: function() {
+                this.count = this.books.length;
+                return this.count;
+            }
+        },
+        //帧听器
+        watch: {
+            num: function(val) {
+                console.log(val.length)
+                if (val.length > 0) {
+                    var isTrue = this.books.some(item => item.num == val);
+                    console.log(isTrue);
+                    if (isTrue) {
+                        //且是添加操作
+                        if (!this.flag) {
+                            this.info_num = "该序号已存在";
+                            this.flag2 = true;
+                        }
+                    } else {
+                        this.info_num = "";
+                        this.flag2 = false;
+                    }
+                } else {
+                    this.info_num = "";
+                }
+
+            },
+            name: function(val) {
+                var isuname = this.books.some(item => item.name == val);
+                if (isuname) {
+                    if (!this.flag) {
+                        this.info_name = "该图书已存在";
+                        this.flag2 = true;
+                    }
+                } else {
+                    this.info_name = "";
+                    this.flag2 = false;
+                }
+            }
+        },
+        mounted: function() {
+            //该生命周期钩子函数被触发，模板已经可以使用
+            //一般此时用于获取后台数据，然后把数据填充到模板
+            this.getData();
+        }
+    });
+    //全局过滤器
+    // Vue.filter("format", function(value, arg) {
+    //格式化时间方法
+    //     function dateFormat(date, format) {
+    //         if (typeof date === 'string') {
+    //             var mts = date.match(/(\/Date\((\d+)\)\/)/);
+    //             if (mts && mts.length >= 3) {
+    //                 date = parseInt(mts[2]);
+    //             }
+    //         }
+    //         date = new Date(date);
+    //         if (!date || date.toUTCString() == "Invalid Date") {
+    //             return '';
+    //         }
+    //         var map = {
+    //             "M": date.getMonth() + 1, //月份
+    //             "d": date.getDate(), //日
+    //             "h": date.getHours(), //小时
+    //             "m": date.getMinutes(), //分
+    //             "s": date.getSeconds(), //秒
+    //             "q": Math.floor((date.getMonth() + 3) / 3), //季度
+    //             "S": date.getMilliseconds(), //毫秒
+    //         };
+    //         format = format.replace(/([yMdhmsqS])+/g, function(all, t) {
+    //             var v = map[t];
+    //             if (v !== undefined) {
+    //                 if (all.length > 1) {
+    //                     v = '0' + v;
+    //                     v = v.substr(v.length - 2)
+    //                 }
+    //                 return v;
+    //             } else if (t === 'y') {
+    //                 return (date.getFullYear() + "").substr(4 - all.length);
+    //             }
+    //             return all;
+    //         });
+    //         return format;
+    //     }
+    //     return dateFormat(value, arg);
+    // });
+</script>
+
+</html>
